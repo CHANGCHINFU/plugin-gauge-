@@ -256,10 +256,41 @@ var checkRouteDisruption = {
     { user: "{{agent}}", content: { text: "Pulling the shipping triangle (disruption + sea-state + AIS throughput) for malacca\u2026", action: "GAUGE_ROUTE_DISRUPTION" } }
   ]]
 };
+var FILING_TICKERS = ["AAPL", "MSFT", "NVDA", "TSLA", "AMZN", "META", "GOOGL", "BA", "F", "INTC", "GME", "AMC", "CVNA", "PLTR", "NFLX", "DIS", "JPM", "BAC"];
+function pickTicker(t) {
+  const up = t.toUpperCase();
+  for (const tk of FILING_TICKERS) if (new RegExp(`\\b${tk}\\b`).test(up)) return tk;
+  return null;
+}
+var checkFilingDistress = {
+  name: "GAUGE_FILING_CHECK",
+  similes: ["FILING_CHECK", "SEC_FILING", "CORPORATE_DISTRESS", "INSIDER_TRADING", "MATERIAL_EVENT", "8K_CHECK", "DISTRESS_CHECK", "EDGAR", "IS_COMPANY_DISTRESSED"],
+  description: "Corporate regulatory-filing distress & insider check for a company: 8-K material events (item severity \u2014 bankruptcy/default/restatement/delisting = critical) + NT late-filing delinquency (distress leading indicator) + Form 4 insider net open-market buy/sell + cross-validation (do insiders confirm the disclosed distress by selling, or contradict it by buying). All official SEC EDGAR. For event-driven/activist/short funds, quant funds, credit & distressed analysts. Costs $0.10 USDC on Base. entity = ticker e.g. AMC, CVNA, GME.",
+  validate: async (rt) => !!wallet(rt),
+  handler: async (rt, m, _s, _o, cb) => {
+    try {
+      const tk = pickTicker(text(m));
+      if (!tk) {
+        cb?.({ text: "Give me a ticker from the watchlist: AAPL, MSFT, NVDA, TSLA, AMZN, META, GOOGL, BA, F, INTC, GME, AMC, CVNA, PLTR, NFLX, DIS, JPM, BAC." });
+        return false;
+      }
+      const d = await paidGet(rt, `/gauge/filing-company?entity=${encodeURIComponent(tk)}`);
+      cb?.({ text: `${d.cross_line_narrative || d.name} ${NEUTRAL}`, content: d });
+      return true;
+    } catch (e) {
+      cb?.({ text: `GAUGE filing-check failed: ${e.message}` });
+      return false;
+    }
+  },
+  examples: [[
+    { user: "{{user1}}", content: { text: "Is AMC in distress and what are insiders doing? AMC" } },
+    { user: "{{agent}}", content: { text: "Pulling the regulatory-filing triangle (8-K + delinquency + insider Form 4) for AMC\u2026", action: "GAUGE_FILING_CHECK" } }
+  ]]
+};
 var gaugePlugin = {
   name: "gauge",
-  description: "GAUGE \u2014 verifiable flood-risk, environmental (river / air quality / precipitation), agriculture (crop drought / heat / vegetation health), power-grid (electricity demand / renewable resource / energy inflation) & shipping (route disruption / sea-state / vessel throughput) signals via x402 (USDC on Base, no API key). Free raw reading; paid decision-grade records with official USGS/NOAA/USDM/EPA/CAMS/ERA5/FRED/Marine thresholds + seasonal statistical anomaly + record_hash provenance. Cross-validation bundles per region/grain belt/grid/chokepoint.",
-  actions: [checkFloodRisk, getRegion, checkCropDrought, checkGridStress, checkRouteDisruption, getRiverFree],
+  description: "GAUGE \u2014 verifiable flood-risk, environmental (river / air quality / precipitation), agriculture (crop drought / heat / vegetation health), power-grid (electricity demand / renewable resource / energy inflation), shipping (route disruption / sea-state / vessel throughput) & regulatory-filing (8-K material events / late-filing delinquency / Form 4 insider) signals via x402 (USDC on Base, no API key). Free raw reading; paid decision-grade records with official USGS/NOAA/USDM/EPA/CAMS/ERA5/FRED/Marine/SEC-EDGAR thresholds + statistical anomaly + record_hash provenance. Cross-validation bundles per region/grain belt/grid/chokepoint/company.",
+  actions: [checkFloodRisk, getRegion, checkCropDrought, checkGridStress, checkRouteDisruption, checkFilingDistress, getRiverFree],
   providers: [],
   evaluators: []
 };
