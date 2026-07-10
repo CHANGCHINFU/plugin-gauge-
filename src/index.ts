@@ -21,7 +21,7 @@ const DEFAULT_BASE = "https://aeml-x402.zeabur.app";
 const setting = (rt: IAgentRuntime, k: string) =>
   (rt?.getSetting?.(k) as string | undefined) ?? process.env[k];
 const baseUrl = (rt: IAgentRuntime) => (setting(rt, "GAUGE_BASE_URL") || DEFAULT_BASE).replace(/\/$/, "");
-const maxAtomic = (rt: IAgentRuntime) => BigInt(setting(rt, "GAUGE_MAX_USDC") || "60000"); // $0.06 hard cap
+const maxAtomic = (rt: IAgentRuntime) => BigInt(setting(rt, "GAUGE_MAX_USDC") || "120000"); // $0.12 hard cap (allows $0.10 region/agri-region; blocks $1 census)
 
 function wallet(rt: IAgentRuntime) {
   let pk = setting(rt, "EVM_PRIVATE_KEY") || setting(rt, "GAUGE_PRIVATE_KEY");
@@ -139,10 +139,47 @@ const getRiverFree: Action = {
   ]],
 };
 
+const GRAIN_LOCS = ["us-iowa", "us-illinois", "us-nebraska", "us-kansas", "ar-pampas", "br-matogrosso", "br-parana", "au-nsw", "in-punjab", "ua-ukraine", "ru-southrussia", "cn-northchina"];
+function pickGrainLoc(t: string): string | null {
+  const s = t.toLowerCase();
+  for (const g of GRAIN_LOCS) if (s.includes(g)) return g;
+  if (s.includes("iowa")) return "us-iowa";
+  if (s.includes("illinois")) return "us-illinois";
+  if (s.includes("nebraska")) return "us-nebraska";
+  if (s.includes("kansas")) return "us-kansas";
+  if (s.includes("pampas") || s.includes("argentin")) return "ar-pampas";
+  if (s.includes("mato grosso") || s.includes("brazil")) return "br-matogrosso";
+  if (s.includes("ukrain")) return "ua-ukraine";
+  if (s.includes("russia") || s.includes("krasnodar")) return "ru-southrussia";
+  if (s.includes("china") || s.includes("shandong")) return "cn-northchina";
+  if (s.includes("australia") || s.includes("nsw")) return "au-nsw";
+  if (s.includes("punjab") || s.includes("india")) return "in-punjab";
+  return null;
+}
+const checkCropDrought: Action = {
+  name: "GAUGE_CROP_DROUGHT",
+  similes: ["CROP_DROUGHT", "AGRICULTURAL_DROUGHT", "CROP_CONDITION", "GRAIN_REGION", "SOIL_MOISTURE", "CROP_STRESS", "HARVEST_RISK", "CROP_YIELD_RISK"],
+  description: "Crop drought & condition check for a grain region: agricultural drought (soil moisture vs official USDM D0–D4) + heat/GDD stress + crop vegetation health (NOAA satellite VHI) + cross-validation (has drought hit the crop canopy yet). For ag traders & crop insurers. Costs $0.10 USDC on Base. loc e.g. us-iowa, ar-pampas, ua-ukraine.",
+  validate: async (rt: IAgentRuntime) => !!wallet(rt),
+  handler: async (rt: IAgentRuntime, m: Memory, _s?: State, _o?: any, cb?: HandlerCallback) => {
+    try {
+      const loc = pickGrainLoc(text(m));
+      if (!loc) { cb?.({ text: "Give me a grain region: us-iowa / us-illinois / us-nebraska / us-kansas, ar-pampas (Argentina), br-matogrosso (Brazil), ua-ukraine, ru-southrussia, cn-northchina, au-nsw (Australia), in-punjab (India)." }); return false; }
+      const d = await paidGet(rt, `/gauge/agri-region?loc=${encodeURIComponent(loc)}`);
+      cb?.({ text: `${d.cross_line_narrative || d.name} ${NEUTRAL}`, content: d });
+      return true;
+    } catch (e: any) { cb?.({ text: `GAUGE crop-drought failed: ${e.message}` }); return false; }
+  },
+  examples: [[
+    { user: "{{user1}}", content: { text: "Is the US Corn Belt (Iowa) in drought and how are the crops? us-iowa" } },
+    { user: "{{agent}}", content: { text: "Pulling the agriculture triangle (drought + heat + crop health) for us-iowa…", action: "GAUGE_CROP_DROUGHT" } },
+  ]],
+};
+
 export const gaugePlugin: Plugin = {
   name: "gauge",
-  description: "GAUGE — verifiable flood-risk & environmental signals (river / air quality / precipitation) via x402 (USDC on Base, no API key). Free raw reading; paid decision-grade records with official USGS/NOAA thresholds + seasonal statistical anomaly + record_hash provenance.",
-  actions: [checkFloodRisk, getRegion, getRiverFree],
+  description: "GAUGE — verifiable flood-risk, environmental (river / air quality / precipitation) & agriculture (crop drought / heat / vegetation health) signals via x402 (USDC on Base, no API key). Free raw reading; paid decision-grade records with official USGS/NOAA/USDM/EPA/CAMS/ERA5 thresholds + seasonal statistical anomaly + record_hash provenance. Cross-validation bundles per region/grain belt.",
+  actions: [checkFloodRisk, getRegion, checkCropDrought, getRiverFree],
   providers: [],
   evaluators: [],
 };

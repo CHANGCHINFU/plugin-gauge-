@@ -44,6 +44,7 @@ const runtime = new AgentRuntime({
 |---|---|---|
 | `GAUGE_FLOOD_RISK` | **$0.05** | Verifiable flood-risk / river-anomaly record: current vs official USGS/NOAA flood thresholds (band, distance-to-action) + 5-yr seasonal anomaly (percentile/strata) + `record_hash`. Works for any signal. |
 | `GAUGE_REGION` | **$0.10** | Three-leg bundle for a location: air quality + precipitation + nearby river + cross-line corroboration. |
+| `GAUGE_CROP_DROUGHT` | **$0.10** | Agriculture triangle for a grain region: agricultural drought (soil moisture vs official USDM D0–D4) + heat/GDD + crop vegetation health (NOAA VHI) + cross-validation (has drought hit the crop canopy). For ag traders & crop insurers. Global grain belts (`us-iowa`, `ar-pampas`, `ua-ukraine`, …). |
 | `GAUGE_RIVER_READING_FREE` | **free** | Raw river reading (current/trend/sources/hash). No wallet needed. |
 
 **Signals**: `hydrology.river-level`, `hydrology.streamflow`, `airquality.aqi`, `airquality.pm25`, `precipitation.daily`, `precipitation.wetness30d`.
