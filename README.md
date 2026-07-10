@@ -8,9 +8,13 @@ Backed by the GAUGE service at **https://aeml-x402.zeabur.app** (discovery: [`/.
 
 ## Install
 
+From GitHub (built `dist/` is committed — no build step needed):
+
 ```bash
-npm install plugin-gauge
+npm install github:CHANGCHINFU/plugin-gauge-
 ```
+
+(Or, once published to npm: `npm install plugin-gauge`.)
 
 ## Configure (agent settings / env)
 
