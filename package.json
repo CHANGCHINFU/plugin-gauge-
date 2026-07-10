@@ -1,0 +1,38 @@
+{
+  "name": "plugin-gauge",
+  "version": "0.1.0",
+  "description": "ElizaOS plugin — GAUGE: verifiable flood-risk & river-anomaly + environmental signals for AI agents via x402 (USDC on Base, no API key). Real-time US river water level (gage height), streamflow, flood stage vs official USGS/NOAA thresholds + 5-year seasonal statistical anomaly + record_hash provenance. Plus air quality (US AQI/PM2.5) and precipitation (rainfall/drought).",
+  "type": "module",
+  "main": "dist/index.js",
+  "module": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "import": "./dist/index.js",
+      "types": "./dist/index.d.ts"
+    }
+  },
+  "files": ["dist", "README.md"],
+  "scripts": {
+    "build": "tsup src/index.ts --format esm --dts --clean",
+    "dev": "tsup src/index.ts --format esm --dts --watch"
+  },
+  "dependencies": {
+    "x402-fetch": "^0.4.0",
+    "viem": "^2.0.0"
+  },
+  "peerDependencies": {
+    "@elizaos/core": "^0.1.0"
+  },
+  "devDependencies": {
+    "tsup": "^8.0.0",
+    "typescript": "^5.4.0"
+  },
+  "keywords": [
+    "elizaos", "eliza-plugin", "x402", "flood risk", "river water level", "gage height",
+    "streamflow", "flood stage", "USGS", "NOAA", "air quality", "AQI", "PM2.5",
+    "precipitation", "drought", "verifiable", "AI agent", "USDC", "Base", "no API key"
+  ],
+  "author": "AEML-DS Vanished-Data Exchange",
+  "license": "MIT"
+}

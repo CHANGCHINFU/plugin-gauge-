@@ -1,0 +1,150 @@
+/**
+ * plugin-gauge — ElizaOS plugin for GAUGE verifiable environmental signals via x402.
+ *
+ * Lets an ElizaOS agent pull decision-grade, on-chain-verifiable flood-risk / river-anomaly
+ * records (and air quality / precipitation) and pay per call in USDC on Base — no API key.
+ * Pure description: official-source facts (USGS/NOAA/EPA/CAMS/ERA5) + back-testable statistics
+ * + record_hash; the agent decides. Payment settles directly to the provider wallet.
+ *
+ * Config (agent settings / env):
+ *   EVM_PRIVATE_KEY   0x-prefixed Base-mainnet wallet key (needs a little USDC; EIP-3009 gasless)
+ *   GAUGE_BASE_URL    optional, default https://aeml-x402.zeabur.app
+ *   GAUGE_MAX_USDC    optional atomic cap per call (default 60000 = $0.06)
+ */
+import type { Plugin, Action, IAgentRuntime, Memory, State, HandlerCallback } from "@elizaos/core";
+import { createWalletClient, http } from "viem";
+import { privateKeyToAccount } from "viem/accounts";
+import { base } from "viem/chains";
+import { wrapFetchWithPayment } from "x402-fetch";
+
+const DEFAULT_BASE = "https://aeml-x402.zeabur.app";
+const setting = (rt: IAgentRuntime, k: string) =>
+  (rt?.getSetting?.(k) as string | undefined) ?? process.env[k];
+const baseUrl = (rt: IAgentRuntime) => (setting(rt, "GAUGE_BASE_URL") || DEFAULT_BASE).replace(/\/$/, "");
+const maxAtomic = (rt: IAgentRuntime) => BigInt(setting(rt, "GAUGE_MAX_USDC") || "60000"); // $0.06 hard cap
+
+function wallet(rt: IAgentRuntime) {
+  let pk = setting(rt, "EVM_PRIVATE_KEY") || setting(rt, "GAUGE_PRIVATE_KEY");
+  if (!pk) return null;
+  if (!pk.startsWith("0x")) pk = "0x" + pk;
+  const account = privateKeyToAccount(pk as `0x${string}`);
+  return createWalletClient({ account, chain: base, transport: http() });
+}
+
+async function paidGet(rt: IAgentRuntime, path: string): Promise<any> {
+  const w = wallet(rt);
+  if (!w) throw new Error("EVM_PRIVATE_KEY not set — needs a Base wallet with a little USDC to pay via x402.");
+  // cast: viem WalletClient works at runtime (EIP-3009 signing); x402-fetch's SignerWallet type is stricter across viem versions
+  const payFetch = wrapFetchWithPayment(fetch, w as any, maxAtomic(rt));
+  const res = await payFetch(baseUrl(rt) + path, { method: "GET" });
+  if (!res.ok) throw new Error(`GAUGE ${res.status}: ${(await res.text()).slice(0, 200)}`);
+  return res.json();
+}
+async function freeGet(rt: IAgentRuntime, path: string): Promise<any> {
+  const res = await fetch(baseUrl(rt) + path, { method: "GET" });
+  if (!res.ok) throw new Error(`GAUGE ${res.status}: ${(await res.text()).slice(0, 200)}`);
+  return res.json();
+}
+
+// 從訊息抽參數(scaffold:寬鬆解析,實際可換成 LLM slot-filling)
+function text(m: Memory) { return (m?.content?.text || "") as string; }
+function pickSignal(t: string): string {
+  const s = t.toLowerCase();
+  if (s.includes("streamflow") || s.includes("discharge")) return "hydrology.streamflow";
+  if (s.includes("pm2") || s.includes("pm 2")) return "airquality.pm25";
+  if (s.includes("aqi") || s.includes("air quality")) return "airquality.aqi";
+  if (s.includes("drought") || s.includes("wet") || s.includes("30")) return "precipitation.wetness30d";
+  if (s.includes("rain") || s.includes("precip")) return "precipitation.daily";
+  return "hydrology.river-level"; // 預設:河川水位
+}
+function pickEntity(t: string): string | null {
+  const usgs = t.match(/\b\d{8,15}\b/);            // USGS site id
+  if (usgs) return usgs[0];
+  const city = t.match(/us-[a-z]+/i);              // city id (air/precip/region)
+  if (city) return city[0].toLowerCase();
+  return null;
+}
+
+const NEUTRAL = "(GAUGE: pure description, no judgment/prediction; official source + record_hash verifiable — you decide.)";
+
+const checkFloodRisk: Action = {
+  name: "GAUGE_FLOOD_RISK",
+  similes: ["FLOOD_RISK", "RIVER_ANOMALY", "CHECK_RIVER", "RIVER_LEVEL", "GAGE_HEIGHT", "STREAMFLOW", "IS_RIVER_ABNORMAL"],
+  description: "Get a verifiable flood-risk / river-anomaly record for a US river gauge (or air/precip signal): current reading vs official USGS/NOAA flood thresholds (band, distance-to-action) + 5-year seasonal statistical anomaly (percentile/strata) + record_hash. Costs $0.05 USDC on Base via x402.",
+  validate: async (rt: IAgentRuntime) => !!wallet(rt),
+  handler: async (rt: IAgentRuntime, m: Memory, _s?: State, _o?: any, cb?: HandlerCallback) => {
+    try {
+      const t = text(m);
+      const signal_id = pickSignal(t);
+      const entity = pickEntity(t);
+      if (!entity) {
+        cb?.({ text: "Give me a station id — a USGS site id (e.g. 07010000 = Mississippi at St. Louis) for rivers, or a city id (e.g. us-chicago) for air/precip. Free station list: /gauge/catalog." });
+        return false;
+      }
+      const d = await paidGet(rt, `/gauge?signal_id=${encodeURIComponent(signal_id)}&entity=${encodeURIComponent(entity)}`);
+      const R = d.standard_ruler || {}, S = d.stat_ruler || {};
+      const cur = JSON.stringify(d.current);
+      const out = `${d.entity_name || entity} — ${d.signal_id}: ${cur} (age ${d.data_age_hours}h).`
+        + (R.band ? ` Official band: ${R.band}${R.official_category ? ` (${R.official_category})` : ""}, distance-to-action ${R.distance_to_action ?? "—"} ${R.unit || ""}.` : "")
+        + (S.frequency_label ? ` Seasonal (${S.window_years}yr): ${Math.round((S.current_percentile ?? 0) * 100)}th pct — ${S.frequency_label}.` : "")
+        + ` record_hash ${d.record_hash?.slice(0, 18)}… ${NEUTRAL}`;
+      cb?.({ text: out, content: d });
+      return true;
+    } catch (e: any) { cb?.({ text: `GAUGE flood-risk failed: ${e.message}` }); return false; }
+  },
+  examples: [[
+    { user: "{{user1}}", content: { text: "Is the Mississippi at St. Louis abnormal right now? site 07010000" } },
+    { user: "{{agent}}", content: { text: "Fetching a verifiable flood-risk record for USGS 07010000…", action: "GAUGE_FLOOD_RISK" } },
+  ]],
+};
+
+const getRegion: Action = {
+  name: "GAUGE_REGION",
+  similes: ["REGION_SIGNALS", "CITY_ENVIRONMENT", "AIR_RAIN_RIVER", "LOCAL_CONDITIONS"],
+  description: "Three-leg bundle for a location: air quality + precipitation + nearby river, with cross-line corroboration narrative. Costs $0.10 USDC on Base via x402. loc e.g. us-stlouis, us-chicago.",
+  validate: async (rt: IAgentRuntime) => !!wallet(rt),
+  handler: async (rt: IAgentRuntime, m: Memory, _s?: State, _o?: any, cb?: HandlerCallback) => {
+    try {
+      const loc = pickEntity(text(m)) || "";
+      if (!loc.startsWith("us-")) { cb?.({ text: "Give me a city id like us-stlouis / us-chicago (see /gauge/preview regions)." }); return false; }
+      const d = await paidGet(rt, `/gauge/region?loc=${encodeURIComponent(loc)}`);
+      cb?.({ text: `${d.cross_line_narrative || d.name} ${NEUTRAL}`, content: d });
+      return true;
+    } catch (e: any) { cb?.({ text: `GAUGE region failed: ${e.message}` }); return false; }
+  },
+  examples: [[
+    { user: "{{user1}}", content: { text: "Give me air, rain and river conditions for St. Louis (us-stlouis)" } },
+    { user: "{{agent}}", content: { text: "Pulling the three-leg region bundle for us-stlouis…", action: "GAUGE_REGION" } },
+  ]],
+};
+
+const getRiverFree: Action = {
+  name: "GAUGE_RIVER_READING_FREE",
+  similes: ["RIVER_READING", "FREE_RIVER", "GAGE_HEIGHT_FREE", "QUICK_RIVER"],
+  description: "Free raw river reading (hydrology only): current/previous/change/trend + sources + record_hash. No payment. Use a USGS site id.",
+  validate: async () => true,
+  handler: async (rt: IAgentRuntime, m: Memory, _s?: State, _o?: any, cb?: HandlerCallback) => {
+    try {
+      const entity = pickEntity(text(m));
+      if (!entity) { cb?.({ text: "Give me a USGS site id (e.g. 07010000). Free list: /gauge/catalog." }); return false; }
+      const sid = text(m).toLowerCase().includes("streamflow") ? "hydrology.streamflow" : "hydrology.river-level";
+      const d = await freeGet(rt, `/gauge/raw?signal_id=${sid}&entity=${encodeURIComponent(entity)}`);
+      cb?.({ text: `${d.entity_name || entity}: ${JSON.stringify(d.current)} (${d.change?.[Object.keys(d.current)[0]]?.direction || "—"}, age ${d.data_age_hours}h). Free base reading; paid flood-risk = GAUGE_FLOOD_RISK. ${NEUTRAL}`, content: d });
+      return true;
+    } catch (e: any) { cb?.({ text: `GAUGE raw failed: ${e.message}` }); return false; }
+  },
+  examples: [[
+    { user: "{{user1}}", content: { text: "Quick free river level for USGS 07010000" } },
+    { user: "{{agent}}", content: { text: "Fetching the free raw reading…", action: "GAUGE_RIVER_READING_FREE" } },
+  ]],
+};
+
+export const gaugePlugin: Plugin = {
+  name: "gauge",
+  description: "GAUGE — verifiable flood-risk & environmental signals (river / air quality / precipitation) via x402 (USDC on Base, no API key). Free raw reading; paid decision-grade records with official USGS/NOAA thresholds + seasonal statistical anomaly + record_hash provenance.",
+  actions: [checkFloodRisk, getRegion, getRiverFree],
+  providers: [],
+  evaluators: [],
+};
+
+export default gaugePlugin;
