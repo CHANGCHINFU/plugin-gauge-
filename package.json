@@ -1,7 +1,7 @@
 {
   "name": "plugin-gauge",
-  "version": "0.2.0",
-  "description": "ElizaOS plugin — GAUGE: verifiable flood-risk, environmental & agriculture signals for AI agents via x402 (USDC on Base, no API key). Real-time river water level (gage height), streamflow, flood stage vs official USGS/NOAA thresholds; air quality (AQI/PM2.5); precipitation/drought; and agricultural drought (USDM D0–D4) + heat/GDD + crop vegetation health (NOAA VHI) for global grain belts. 5–44yr seasonal anomaly + record_hash provenance.",
+  "version": "0.3.0",
+  "description": "ElizaOS plugin — GAUGE: verifiable flood-risk, environmental, agriculture & power-grid signals for AI agents via x402 (USDC on Base, no API key). Real-time river water level (gage height), streamflow, flood stage vs official USGS/NOAA thresholds; air quality (AQI/PM2.5); precipitation/drought; agricultural drought (USDM D0–D4) + heat/GDD + crop vegetation health (NOAA VHI) for global grain belts; and power-grid demand (HDD/CDD) + renewable resource (solar/wind) + energy inflation (FRED CPI Energy) / gas price for global grids. 5–44yr seasonal anomaly + record_hash provenance.",
   "type": "module",
   "main": "dist/index.js",
   "module": "dist/index.js",

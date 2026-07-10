@@ -45,9 +45,10 @@ const runtime = new AgentRuntime({
 | `GAUGE_FLOOD_RISK` | **$0.05** | Verifiable flood-risk / river-anomaly record: current vs official USGS/NOAA flood thresholds (band, distance-to-action) + 5-yr seasonal anomaly (percentile/strata) + `record_hash`. Works for any signal. |
 | `GAUGE_REGION` | **$0.10** | Three-leg bundle for a location: air quality + precipitation + nearby river + cross-line corroboration. |
 | `GAUGE_CROP_DROUGHT` | **$0.10** | Agriculture triangle for a grain region: agricultural drought (soil moisture vs official USDM D0–D4) + heat/GDD + crop vegetation health (NOAA VHI) + cross-validation (has drought hit the crop canopy). For ag traders & crop insurers. Global grain belts (`us-iowa`, `ar-pampas`, `ua-ukraine`, …). |
+| `GAUGE_GRID_STRESS` | **$0.10** | Power grid triangle for a grid region: electricity demand pressure (temperature HDD/CDD load proxy) + renewable resource (solar/wind potential) + energy inflation (US CPI Energy YoY) / natural gas price (Henry Hub) + cross-validation (high demand × low renewables = grid squeeze → energy price/inflation up). For power/energy & macro/inflation traders, utilities, renewable investors. Global grids (`us-ercot`, `us-caiso`, `eu-germany`, …); energy inflation/gas are US-national. Weather-driven proxy, not actual MW. |
 | `GAUGE_RIVER_READING_FREE` | **free** | Raw river reading (current/trend/sources/hash). No wallet needed. |
 
-**Signals**: `hydrology.river-level`, `hydrology.streamflow`, `airquality.aqi`, `airquality.pm25`, `precipitation.daily`, `precipitation.wetness30d`.
+**Signals**: `hydrology.river-level`, `hydrology.streamflow`, `airquality.aqi`, `airquality.pm25`, `precipitation.daily`, `precipitation.wetness30d`, `agriculture.drought`, `agriculture.heat`, `agriculture.crop-vhi`, `electricity.demand`, `electricity.renewable`, `energy.inflation`, `energy.gas-price`.
 **Entities**: USGS site id (e.g. `07010000` = Mississippi at St. Louis) for rivers; city id (e.g. `us-chicago`) for air/precip/region. Free station list: `/gauge/catalog`.
 
 À-la-carte add-ons (`/gauge/ruler` $0.01, `/gauge/calibrated` $0.02, `/gauge/strata` $0.03, `/gauge/history` $0.03, `/gauge/air` $0.02, `/gauge/precip` $0.02) and cross-station `/gauge/census` ($1) are available on the API; add actions as needed.

@@ -170,10 +170,53 @@ var checkCropDrought = {
     { user: "{{agent}}", content: { text: "Pulling the agriculture triangle (drought + heat + crop health) for us-iowa\u2026", action: "GAUGE_CROP_DROUGHT" } }
   ]]
 };
+var GRID_LOCS = ["us-ercot", "us-caiso", "us-pjm", "us-miso", "us-nyiso", "eu-germany", "eu-france", "eu-uk", "eu-spain", "jp-japan", "au-nem", "in-india"];
+function pickGridLoc(t) {
+  const s = t.toLowerCase();
+  for (const g of GRID_LOCS) if (s.includes(g)) return g;
+  if (s.includes("ercot") || s.includes("texas")) return "us-ercot";
+  if (s.includes("caiso") || s.includes("california")) return "us-caiso";
+  if (s.includes("pjm")) return "us-pjm";
+  if (s.includes("miso") || s.includes("midwest")) return "us-miso";
+  if (s.includes("nyiso") || s.includes("new york")) return "us-nyiso";
+  if (s.includes("german")) return "eu-germany";
+  if (s.includes("france") || s.includes("french")) return "eu-france";
+  if (s.includes("uk") || s.includes("britain") || s.includes("england")) return "eu-uk";
+  if (s.includes("spain") || s.includes("spanish")) return "eu-spain";
+  if (s.includes("japan")) return "jp-japan";
+  if (s.includes("australia") || s.includes("nem")) return "au-nem";
+  if (s.includes("india")) return "in-india";
+  return null;
+}
+var checkGridStress = {
+  name: "GAUGE_GRID_STRESS",
+  similes: ["GRID_STRESS", "POWER_GRID", "ELECTRICITY_DEMAND", "GRID_LOAD", "POWER_PRICE", "ENERGY_INFLATION", "RENEWABLE_RESOURCE", "ENERGY_PRICE_RISK"],
+  description: "Grid stress, power price & energy inflation check for a grid region: electricity demand pressure (temperature degree days HDD+CDD, load proxy) + renewable resource (solar/wind generation potential) + energy inflation (US CPI Energy YoY) / natural gas price (Henry Hub) + cross-validation (high demand \xD7 low renewables = grid squeeze \u2192 energy price/inflation up). For power/energy & macro/inflation traders, utilities, renewable investors. Weather-driven proxy, not actual MW. Costs $0.10 USDC on Base. loc e.g. us-ercot, us-caiso, eu-germany.",
+  validate: async (rt) => !!wallet(rt),
+  handler: async (rt, m, _s, _o, cb) => {
+    try {
+      const loc = pickGridLoc(text(m));
+      if (!loc) {
+        cb?.({ text: "Give me a grid region: us-ercot (Texas) / us-caiso (California) / us-pjm / us-miso / us-nyiso, eu-germany / eu-france / eu-uk / eu-spain, jp-japan, au-nem (Australia), in-india. Energy inflation/gas price are US-national." });
+        return false;
+      }
+      const d = await paidGet(rt, `/gauge/grid-region?loc=${encodeURIComponent(loc)}`);
+      cb?.({ text: `${d.cross_line_narrative || d.name} ${NEUTRAL}`, content: d });
+      return true;
+    } catch (e) {
+      cb?.({ text: `GAUGE grid-stress failed: ${e.message}` });
+      return false;
+    }
+  },
+  examples: [[
+    { user: "{{user1}}", content: { text: "How stressed is the Texas grid and what's energy inflation doing? us-ercot" } },
+    { user: "{{agent}}", content: { text: "Pulling the power grid triangle (demand + renewables + energy inflation) for us-ercot\u2026", action: "GAUGE_GRID_STRESS" } }
+  ]]
+};
 var gaugePlugin = {
   name: "gauge",
-  description: "GAUGE \u2014 verifiable flood-risk, environmental (river / air quality / precipitation) & agriculture (crop drought / heat / vegetation health) signals via x402 (USDC on Base, no API key). Free raw reading; paid decision-grade records with official USGS/NOAA/USDM/EPA/CAMS/ERA5 thresholds + seasonal statistical anomaly + record_hash provenance. Cross-validation bundles per region/grain belt.",
-  actions: [checkFloodRisk, getRegion, checkCropDrought, getRiverFree],
+  description: "GAUGE \u2014 verifiable flood-risk, environmental (river / air quality / precipitation), agriculture (crop drought / heat / vegetation health) & power-grid (electricity demand / renewable resource / energy inflation) signals via x402 (USDC on Base, no API key). Free raw reading; paid decision-grade records with official USGS/NOAA/USDM/EPA/CAMS/ERA5/FRED thresholds + seasonal statistical anomaly + record_hash provenance. Cross-validation bundles per region/grain belt/grid.",
+  actions: [checkFloodRisk, getRegion, checkCropDrought, checkGridStress, getRiverFree],
   providers: [],
   evaluators: []
 };
