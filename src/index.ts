@@ -214,10 +214,48 @@ const checkGridStress: Action = {
   ]],
 };
 
+const SHIP_LOCS = ["suez-redsea", "panama-pacific", "malacca", "hormuz", "goodhope", "channel", "biscay", "northsea", "gulfmexico", "southchinasea", "bengal", "northpacific"];
+function pickShipLoc(t: string): string | null {
+  const s = t.toLowerCase();
+  for (const g of SHIP_LOCS) if (s.includes(g)) return g;
+  if (s.includes("suez") || s.includes("red sea")) return "suez-redsea";
+  if (s.includes("panama")) return "panama-pacific";
+  if (s.includes("malacca")) return "malacca";
+  if (s.includes("hormuz")) return "hormuz";
+  if (s.includes("good hope") || s.includes("goodhope") || s.includes("cape")) return "goodhope";
+  if (s.includes("channel")) return "channel";
+  if (s.includes("biscay")) return "biscay";
+  if (s.includes("north sea")) return "northsea";
+  if (s.includes("gulf of mexico") || s.includes("gulf")) return "gulfmexico";
+  if (s.includes("south china")) return "southchinasea";
+  if (s.includes("bengal")) return "bengal";
+  if (s.includes("north pacific") || s.includes("pacific")) return "northpacific";
+  return null;
+}
+const checkRouteDisruption: Action = {
+  name: "GAUGE_ROUTE_DISRUPTION",
+  similes: ["ROUTE_DISRUPTION", "SHIPPING_DISRUPTION", "PORT_CONGESTION", "SEA_STATE", "CHOKEPOINT", "VESSEL_THROUGHPUT", "SHIPPING_LANE", "LOGISTICS_FLOW", "WAVE_HEIGHT"],
+  description: "Shipping route disruption, sea-state & vessel throughput check for a chokepoint/port: logistics-flow disruption (sea state WMO + wind vs operational thresholds) + sea-state cause (wave decomposition: local-storm vs distant-swell) + live AIS vessel throughput (waiting/anchored vs transiting + congestion) + cross-validation (has the disruption reduced actual flow). For shipping lines, commodity/freight traders, ports, marine insurers. Costs $0.10 USDC on Base. loc e.g. malacca, suez-redsea, channel.",
+  validate: async (rt: IAgentRuntime) => !!wallet(rt),
+  handler: async (rt: IAgentRuntime, m: Memory, _s?: State, _o?: any, cb?: HandlerCallback) => {
+    try {
+      const loc = pickShipLoc(text(m));
+      if (!loc) { cb?.({ text: "Give me a chokepoint/port: suez-redsea / panama-pacific / malacca / hormuz / goodhope / channel / biscay / northsea / gulfmexico / southchinasea / bengal / northpacific." }); return false; }
+      const d = await paidGet(rt, `/gauge/shipping-region?loc=${encodeURIComponent(loc)}`);
+      cb?.({ text: `${d.cross_line_narrative || d.name} ${NEUTRAL}`, content: d });
+      return true;
+    } catch (e: any) { cb?.({ text: `GAUGE route-disruption failed: ${e.message}` }); return false; }
+  },
+  examples: [[
+    { user: "{{user1}}", content: { text: "Is the Strait of Malacca disrupted and how's vessel throughput? malacca" } },
+    { user: "{{agent}}", content: { text: "Pulling the shipping triangle (disruption + sea-state + AIS throughput) for malacca…", action: "GAUGE_ROUTE_DISRUPTION" } },
+  ]],
+};
+
 export const gaugePlugin: Plugin = {
   name: "gauge",
-  description: "GAUGE — verifiable flood-risk, environmental (river / air quality / precipitation), agriculture (crop drought / heat / vegetation health) & power-grid (electricity demand / renewable resource / energy inflation) signals via x402 (USDC on Base, no API key). Free raw reading; paid decision-grade records with official USGS/NOAA/USDM/EPA/CAMS/ERA5/FRED thresholds + seasonal statistical anomaly + record_hash provenance. Cross-validation bundles per region/grain belt/grid.",
-  actions: [checkFloodRisk, getRegion, checkCropDrought, checkGridStress, getRiverFree],
+  description: "GAUGE — verifiable flood-risk, environmental (river / air quality / precipitation), agriculture (crop drought / heat / vegetation health), power-grid (electricity demand / renewable resource / energy inflation) & shipping (route disruption / sea-state / vessel throughput) signals via x402 (USDC on Base, no API key). Free raw reading; paid decision-grade records with official USGS/NOAA/USDM/EPA/CAMS/ERA5/FRED/Marine thresholds + seasonal statistical anomaly + record_hash provenance. Cross-validation bundles per region/grain belt/grid/chokepoint.",
+  actions: [checkFloodRisk, getRegion, checkCropDrought, checkGridStress, checkRouteDisruption, getRiverFree],
   providers: [],
   evaluators: [],
 };
