@@ -1,7 +1,7 @@
 /**
  * plugin-gauge — ElizaOS plugin for GAUGE verifiable environmental signals via x402.
  *
- * Lets an ElizaOS agent pull decision-grade, on-chain-verifiable flood-risk / river-anomaly
+ * Lets an ElizaOS agent pull screening-level, on-chain-verifiable flood-risk / river-anomaly
  * records (and air quality / precipitation) and pay per call in USDC on Base — no API key.
  * Pure description: official-source facts (USGS/NOAA/EPA/CAMS/ERA5) + back-testable statistics
  * + record_hash; the agent decides. Payment settles directly to the provider wallet.
@@ -280,7 +280,7 @@ const checkFilingDistress: Action = {
 
 export const gaugePlugin: Plugin = {
   name: "gauge",
-  description: "GAUGE — verifiable flood-risk, environmental (river / air quality / precipitation), agriculture (crop drought / heat / vegetation health), power-grid (electricity demand / renewable resource / energy inflation), shipping (route disruption / sea-state / vessel throughput) & regulatory-filing (8-K material events / late-filing delinquency / Form 4 insider) signals via x402 (USDC on Base, no API key). Free raw reading; paid decision-grade records with official USGS/NOAA/USDM/EPA/CAMS/ERA5/FRED/Marine/SEC-EDGAR thresholds + statistical anomaly + record_hash provenance. Cross-validation bundles per region/grain belt/grid/chokepoint/company.",
+  description: "GAUGE — verifiable flood-risk, environmental (river / air quality / precipitation), agriculture (crop drought / heat / vegetation health), power-grid (electricity demand / renewable resource / energy inflation), shipping (route disruption / sea-state / vessel throughput) & regulatory-filing (8-K material events / late-filing delinquency / Form 4 insider) signals via x402 (USDC on Base, no API key). Free raw reading; paid screening-level records with official USGS/NOAA/USDM/EPA/CAMS/ERA5/FRED/Marine/SEC-EDGAR thresholds + statistical anomaly + record_hash provenance. Cross-validation bundles per region/grain belt/grid/chokepoint/company.",
   actions: [checkFloodRisk, getRegion, checkCropDrought, checkGridStress, checkRouteDisruption, checkFilingDistress, getRiverFree],
   providers: [],
   evaluators: [],

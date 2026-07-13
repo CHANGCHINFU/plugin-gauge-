@@ -3,7 +3,7 @@ import { Plugin } from '@elizaos/core';
 /**
  * plugin-gauge — ElizaOS plugin for GAUGE verifiable environmental signals via x402.
  *
- * Lets an ElizaOS agent pull decision-grade, on-chain-verifiable flood-risk / river-anomaly
+ * Lets an ElizaOS agent pull screening-level, on-chain-verifiable flood-risk / river-anomaly
  * records (and air quality / precipitation) and pay per call in USDC on Base — no API key.
  * Pure description: official-source facts (USGS/NOAA/EPA/CAMS/ERA5) + back-testable statistics
  * + record_hash; the agent decides. Payment settles directly to the provider wallet.
