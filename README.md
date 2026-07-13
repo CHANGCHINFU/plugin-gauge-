@@ -1,5 +1,9 @@
 # plugin-gauge — ElizaOS plugin for GAUGE (verifiable environmental signals via x402)
 
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](./LICENSE)
+[![ElizaOS Plugin](https://img.shields.io/badge/ElizaOS-plugin-8b5cf6)](https://github.com/elizaOS/eliza)
+[![x402](https://img.shields.io/badge/x402-pay--per--call-22c55e)](https://x402.org)
+
 Let an [ElizaOS](https://github.com/elizaOS/eliza) agent pull **verifiable flood-risk / river-anomaly** records (and air quality / precipitation) and **pay per call in USDC on Base** — no API key, no signup.
 
 Every record ships with `record_hash` + OpenTimestamps (Bitcoin-anchored) provenance. **Pure description** — official-source facts (USGS / NOAA / EPA / CAMS / ERA5) + back-testable statistics; the agent decides. Payment settles **directly to the provider wallet** via x402 (EIP-3009, gasless).
